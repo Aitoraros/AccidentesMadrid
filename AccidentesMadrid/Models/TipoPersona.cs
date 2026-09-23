@@ -2,5 +2,5 @@
 
 public enum TipoPersona
 {
-    
+    Conductor, Pasajero, Peaton, Desconocido
 }
