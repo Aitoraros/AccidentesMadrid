@@ -1,7 +1,6 @@
 ﻿using System.Globalization;
 using System.Text;
 using AccidentesMadrid.Config;
-using AccidentesMadrid.Errors;
 using AccidentesMadrid.Mappers;
 using AccidentesMadrid.Models;
 using CSharpFunctionalExtensions;
@@ -23,14 +22,14 @@ public class AccidentesRepository : IAccidentesRepository
         InitStorage(dataFolder);
     }
 
-    public Result<IEnumerable<Accidente>, DomainError> Cargar(string path)
+    public Result<IEnumerable<Accidente>, string> Cargar(string path)
     {
         _logger.Debug("Cargando accidentes desde el archivo '{path}'", path);
 
         if (!Path.Exists(path))
         {
             _logger.Warning("El archivo '{path}' no existe.", path);
-            return Result.Failure<IEnumerable<Accidente>, DomainError>(RepositoryErrors.FileNotFound(path));
+            return Result.Failure<IEnumerable<Accidente>, string>($"No se ha encontrado el archivo '{path}'.");
         }
 
         try
@@ -58,17 +57,16 @@ public class AccidentesRepository : IAccidentesRepository
                 accidentes.Add(campos.ToAccidente());
             }
 
-            return Result.Success<IEnumerable<Accidente>, DomainError>(accidentes);
+            return Result.Success<IEnumerable<Accidente>, string>(accidentes);
         }
         catch (Exception ex)
         {
             _logger.Error(ex, "Ha sucedido un error al cargar los accidentes desde el archivo '{path}'.", path);
-            return Result.Failure<IEnumerable<Accidente>, DomainError>(RepositoryErrors.InvalidFormat(ex.Message));
+            return Result.Failure<IEnumerable<Accidente>, string>($"Formato inválido: {ex.Message}");
         }
     }
 
-    /// <inheritdoc cref="IAccidentesRepository.CargarTodos"/>
-    public Result<IEnumerable<Accidente>, DomainError> CargarTodos(IEnumerable<string> paths)
+    public Result<IEnumerable<Accidente>, string> CargarTodos(IEnumerable<string> paths)
     {
         var todos = new List<Accidente>();
 
@@ -77,13 +75,29 @@ public class AccidentesRepository : IAccidentesRepository
             var resultado = Cargar(path);
             if (resultado.IsFailure)
             {
-                return Result.Failure<IEnumerable<Accidente>, DomainError>(resultado.Error);
+                return Result.Failure<IEnumerable<Accidente>, string>(resultado.Error);
             }
             todos.AddRange(resultado.Value);
         }
 
         _logger.Debug("Cargados {Total} accidentes en total.", todos.Count);
-        return Result.Success<IEnumerable<Accidente>, DomainError>(todos);
+        return Result.Success<IEnumerable<Accidente>, string>(todos);
+    }
+
+    public async Task<Result<IEnumerable<Accidente>, string>> CargarTodosParaleloAsync(IEnumerable<string> paths)
+    {
+        var tareas = paths.Select(path => Task.Run(() => Cargar(path))).ToList();
+        var resultados = await Task.WhenAll(tareas);
+
+        var fallo = resultados.FirstOrDefault(r => r.IsFailure);
+        if (fallo.IsFailure)
+        {
+            return Result.Failure<IEnumerable<Accidente>, string>(fallo.Error);
+        }
+
+        var todos = resultados.SelectMany(r => r.Value).ToList();
+        _logger.Debug("Cargados {Total} accidentes en total (paralelo).", todos.Count);
+        return Result.Success<IEnumerable<Accidente>, string>(todos);
     }
 
     private void InitStorage(string folder)

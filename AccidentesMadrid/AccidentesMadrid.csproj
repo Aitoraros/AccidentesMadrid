@@ -29,11 +29,18 @@
     <ItemGroup>
       <PackageReference Include="CSharpFunctionalExtensions" Version="3.7.0" />
       <PackageReference Include="CsvHelper" Version="33.1.0" />
+      <PackageReference Include="Microsoft.Data.Analysis" Version="0.24.0-preview.26457.2" />
       <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="11.0.0-rc.1.26425.128" />
       <PackageReference Include="Microsoft.Extensions.Logging.Configuration" Version="11.0.0-rc.1.26425.128" />
       <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.1" />
       <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
       <PackageReference Include="Serilog.Sinks.File" Version="8.0.0-nblumhardt-02322" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Update="docker-compose.yml">
+        <DependentUpon>Dockerfile</DependentUpon>
+      </None>
     </ItemGroup>
 
 </Project>
