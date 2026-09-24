@@ -1,9 +1,12 @@
-﻿using System.Text;
+﻿using System.Globalization;
+using System.Text;
 using AccidentesMadrid.Config;
 using AccidentesMadrid.Errors;
 using AccidentesMadrid.Mappers;
 using AccidentesMadrid.Models;
 using CSharpFunctionalExtensions;
+using CsvHelper;
+using CsvHelper.Configuration;
 using Serilog;
 
 namespace AccidentesMadrid.Repositories;
@@ -20,7 +23,6 @@ public class AccidentesRepository : IAccidentesRepository
         InitStorage(dataFolder);
     }
 
-    /// <inheritdoc cref="IAccidentesRepository.Cargar"/>
     public Result<IEnumerable<Accidente>, DomainError> Cargar(string path)
     {
         _logger.Debug("Cargando accidentes desde el archivo '{path}'", path);
@@ -33,14 +35,28 @@ public class AccidentesRepository : IAccidentesRepository
 
         try
         {
-            var cabecera = File.ReadLines(path, Encoding.UTF8).First().Split(';');
+            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                Delimiter = ";",
+                HasHeaderRecord = true,
+                MissingFieldFound = null,
+                BadDataFound = null,
+                TrimOptions = TrimOptions.Trim
+            };
 
-            var accidentes = File.ReadLines(path, Encoding.UTF8)
-                .Skip(1)
-                .Where(linea => !string.IsNullOrWhiteSpace(linea))
-                .Select(linea => linea.Split(';'))
-                .Select(campos => MapearCampos(cabecera, campos).ToAccidente())
-                .ToList();
+            using var reader = new StreamReader(path, Encoding.UTF8);
+            using var csv = new CsvReader(reader, config);
+
+            csv.Read();
+            csv.ReadHeader();
+            var cabecera = csv.HeaderRecord!;
+
+            var accidentes = new List<Accidente>();
+            while (csv.Read())
+            {
+                var campos = cabecera.ToDictionary(h => h, h => csv.GetField(h) ?? "");
+                accidentes.Add(campos.ToAccidente());
+            }
 
             return Result.Success<IEnumerable<Accidente>, DomainError>(accidentes);
         }
@@ -69,10 +85,6 @@ public class AccidentesRepository : IAccidentesRepository
         _logger.Debug("Cargados {Total} accidentes en total.", todos.Count);
         return Result.Success<IEnumerable<Accidente>, DomainError>(todos);
     }
-
-    private static Dictionary<string, string> MapearCampos(string[] cabecera, string[] campos) =>
-        cabecera.Zip(campos, (clave, valor) => (clave, valor))
-                .ToDictionary(x => x.clave, x => x.valor);
 
     private void InitStorage(string folder)
     {

@@ -13,5 +13,28 @@ public class AppConfig
     }
     
     public static IConfiguration Config { get; }
-    
+
+    public static string DataFolder => Path.Combine(
+        AppDomain.CurrentDomain.BaseDirectory,
+        Config.GetValue<string>("Repository:Directory") ?? "data");
+
+    public static string[] Ficheros =>
+        ["Accidentalidad-2024.csv", "Accidentalidad-2025.csv", "Accidentalidad-2026.csv"];
+
+    public static IEnumerable<string> RutasCompletas =>
+        Ficheros.Select(f => Path.Combine(DataFolder, f));
+
+    // logs
+    public static string LogMinimumLevel => 
+        Config.GetValue<string>("Serilog:MinimumLevel") ?? "Debug";
+
+    public static string LogFilePath => 
+        Config.GetValue<string>("Serilog:WriteTo:1:Args:path") ?? "log/log-.txt";
+
+    public static int LogRetainedFiles => 
+        Config.GetValue<int>("Serilog:WriteTo:1:Args:retainedFileCountLimit", 5);
+
+    public static string LogOutputTemplate => 
+        Config.GetValue<string>("Serilog:WriteTo:1:Args:outputTemplate") ?? 
+        "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}";
 }
